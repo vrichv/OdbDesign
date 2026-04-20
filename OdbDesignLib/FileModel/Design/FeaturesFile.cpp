@@ -8,6 +8,7 @@
 #include "SymbolName.h"
 #include "equals_within.h"
 #include "macros.h"
+#include "../../ParserOptions.h"
 
 #include <algorithm>
 #include <cctype>
@@ -284,11 +285,15 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						std::string attrIdString;
-						lineStream >> attrIdString;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+						if (lineStream >> attrIdString)
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							pFeatureRecord->ParseAttributeLookupTable(attrIdString);
+						}
+						else
+						{
+							if (!OdbDesign::g_parser_options.optional_attr)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						m_featureRecords.push_back(pFeatureRecord);
@@ -352,12 +357,14 @@ namespace Odb::Lib::FileModel::Design
 
 						if (!(lineStream >> pFeatureRecord->dcode))
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!OdbDesign::g_parser_options.optional_dcode)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						if (!(lineStream >> pFeatureRecord->orient_def))
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!OdbDesign::g_parser_options.optional_orient)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						std::string attrIdString;
@@ -365,7 +372,8 @@ namespace Odb::Lib::FileModel::Design
 
 						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!OdbDesign::g_parser_options.optional_attr)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						m_featureRecords.push_back(pFeatureRecord);
@@ -442,9 +450,20 @@ namespace Odb::Lib::FileModel::Design
 							throw_parse_error(m_path, line, token, lineNumber);
 						}
 
-						if (!(lineStream >> std::quoted(pFeatureRecord->text, '\'')))
+						std::string text;
+						std::getline(lineStream, text);
+
+						if (text.size() == 0)
+							text = "";
+						else
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							// Try to parse quoted text
+							std::stringstream textStream(text);
+							if (!(textStream >> std::quoted(pFeatureRecord->text, '\'')))
+							{
+								if (!OdbDesign::g_parser_options.optional_attr)
+									throw_parse_error(m_path, line, token, lineNumber);
+							}
 						}
 
 						if (!(lineStream >> pFeatureRecord->version))
@@ -548,11 +567,19 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						std::string attrIdString;
-						lineStream >> attrIdString;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+						if (lineStream >> attrIdString)
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+							{
+								if (!OdbDesign::g_parser_options.optional_attr)
+									throw_parse_error(m_path, line, token, lineNumber);
+							}
+						}
+						else
+						{
+							if (!OdbDesign::g_parser_options.optional_attr)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						m_featureRecords.push_back(pFeatureRecord);

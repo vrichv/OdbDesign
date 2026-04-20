@@ -1,5 +1,6 @@
 #include "AttributeLookupTable.h"
 #include <sstream>
+#include "../../ParserOptions.h"
 
 namespace Odb::Lib::FileModel::Design
 {

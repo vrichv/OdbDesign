@@ -1,0 +1,241 @@
+diff --git a/OdbDesignLib/ParserOptions.h b/OdbDesignLib/ParserOptions.h
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/OdbDesignLib/ParserOptions.h
+@@ -0,0 +1,22 @@
++#pragma once
++
++namespace OdbDesign
++{
++
++struct ParserOptions
++{
++    bool altium_compat = true;
++
++    bool optional_attr = true;
++    bool optional_dcode = true;
++    bool optional_orient = true;
++    bool optional_mirror = true;
++
++    bool case_insensitive_path = true;
++    bool allow_missing_attr_table = true;
++};
++
++extern ParserOptions g_parser_options;
++
++}
++
+
+diff --git a/OdbDesignLib/ParserOptions.cpp b/OdbDesignLib/ParserOptions.cpp
+new file mode 100644
+index 0000000..1111111
+--- /dev/null
++++ b/OdbDesignLib/ParserOptions.cpp
+@@ -0,0 +1,7 @@
++#include "ParserOptions.h"
++
++namespace OdbDesign
++{
++ParserOptions g_parser_options;
++}
++
+
+diff --git a/OdbDesignLib/FileModel/Design/FeaturesFile.cpp b/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
+index 3abdf12..9a11234 100644
+--- a/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
++++ b/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
+@@ -10,6 +10,7 @@
+ #include "FeaturesFile.h"
+ #include "FeatureRecord.h"
+ #include <sstream>
++#include "../../ParserOptions.h"
+ 
+ using namespace OdbDesign;
+ 
+@@ -540,9 +541,18 @@ else if (line.find(FeatureRecord::ARC_TOKEN) == 0)
+ 
+     std::string attrIdString;
+ 
+-    lineStream >> attrIdString;
+-
+-    if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++    if (lineStream >> attrIdString)
++    {
++        if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++        {
++            if (!g_parser_options.optional_attr)
++                throw_parse_error("ARC attr parse error");
++        }
++    }
++    else
++    {
++        if (!g_parser_options.optional_attr)
++            throw_parse_error("missing attr");
+     }
+ 
+ }
+@@ -420,7 +430,16 @@ else if (line.find(FeatureRecord::LINE_TOKEN) == 0)
+ 
+     std::string attrIdString;
+ 
+-    lineStream >> attrIdString;
++    if (lineStream >> attrIdString)
++    {
++        pFeatureRecord->ParseAttributeLookupTable(attrIdString);
++    }
++    else
++    {
++        if (!g_parser_options.optional_attr)
++            throw_parse_error("LINE attr missing");
++    }
++
+ 
+ }
+ 
+@@ -650,7 +670,18 @@ else if (line.find(FeatureRecord::PAD_TOKEN) == 0)
+ 
+     int dcode = 0;
+ 
+-    lineStream >> dcode;
++    if (!(lineStream >> dcode))
++    {
++        if (!g_parser_options.optional_dcode)
++            throw_parse_error("PAD dcode missing");
++    }
++
++    int orient = 0;
++    lineStream >> orient;
++
++    int mirror = 0;
++    lineStream >> mirror;
++
+ 
+     std::string attrIdString;
+ 
+@@ -760,7 +790,10 @@ else if (line.find(FeatureRecord::TEXT_TOKEN) == 0)
+ 
+     std::string text;
+ 
+-    lineStream >> text;
++    std::getline(lineStream, text);
++
++    if (text.size() == 0)
++        text = "";
+ 
+ }
+ 
+
+diff --git a/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp b/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
+index 551aa22..661bb33 100644
+--- a/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
++++ b/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
+@@ -1,6 +1,7 @@
+ #include "AttributeLookupTable.h"
+ #include <stdexcept>
++#include "../../ParserOptions.h"
+ 
+ bool AttributeLookupTable::Parse(...)
+ {
+@@ -55,7 +56,12 @@
+ 
+     if (!found)
+     {
+-        throw std::runtime_error("attribute lookup fail");
++        if (OdbDesign::g_parser_options.allow_missing_attr_table)
++        {
++            return true;
++        }
++        throw std::runtime_error("attribute lookup fail");
++
+     }
+ 
+     return true;
+
+diff --git a/OdbDesignLib/FileModel/Design/MatrixFile.cpp b/OdbDesignLib/FileModel/Design/MatrixFile.cpp
+index 1111111..2222222 100644
+--- a/OdbDesignLib/FileModel/Design/MatrixFile.cpp
++++ b/OdbDesignLib/FileModel/Design/MatrixFile.cpp
+@@ -1,6 +1,7 @@
+ #include "MatrixFile.h"
+ #include <string>
++#include "../../ParserOptions.h"
+ 
+ double unitScale = 25.4;
+ 
+@@ -80,6 +81,20 @@
+ 
+     if (line.find("UNITS") != std::string::npos)
+     {
++        if (line.find("MM") != std::string::npos)
++        {
++            unitScale = 1.0;
++        }
++
++        if (line.find("INCH") != std::string::npos)
++        {
++            unitScale = 25.4;
++        }
++
++        if (line.find("MIL") != std::string::npos)
++        {
++            unitScale = 0.0254;
++        }
+     }
+ 
+
+diff --git a/OdbDesignLib/FileModel/Design/FileArchive.cpp b/OdbDesignLib/FileModel/Design/FileArchive.cpp
+index 1212121..3434343 100644
+--- a/OdbDesignLib/FileModel/Design/FileArchive.cpp
++++ b/OdbDesignLib/FileModel/Design/FileArchive.cpp
+@@ -10,6 +10,22 @@
+ #include <filesystem>
+ 
++static std::filesystem::path FindCaseInsensitive(
++    const std::filesystem::path& base,
++    const std::string& name)
++{
++    for (auto& p : std::filesystem::directory_iterator(base))
++    {
++        auto n = p.path().filename().string();
++        std::transform(n.begin(), n.end(), n.begin(), ::tolower);
++
++        std::string t = name;
++        std::transform(t.begin(), t.end(), t.begin(), ::tolower);
++
++        if (n == t)
++            return p.path();
++    }
++    return base / name;
++}
+ 
+ bool FileArchive::Exists(...)
+ {
+@@ -55,7 +70,12 @@
+ 
+     if (!std::filesystem::exists(path))
+     {
+-        return false;
++        if (OdbDesign::g_parser_options.case_insensitive_path)
++        {
++            path = FindCaseInsensitive(path.parent_path(), path.filename().string());
++            return std::filesystem::exists(path);
++        }
++        return false;
+     }
+ 
+     return true;
+
+diff --git a/OdbDesignLib/CMakeLists.txt b/OdbDesignLib/CMakeLists.txt
+index 111111..222222 100644
+--- a/OdbDesignLib/CMakeLists.txt
++++ b/OdbDesignLib/CMakeLists.txt
+@@ -10,6 +10,8 @@
+ 
+ add_library(OdbDesignLib
+ 
++ParserOptions.cpp
++
+ FileModel/Design/FeaturesFile.cpp
+ FileModel/Design/LayerDirectory.cpp
+ FileModel/Design/StepDirectory.cpp

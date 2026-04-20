@@ -16,6 +16,7 @@
 #include "../OdbFile.h"
 #include <memory>
 #include <ostream>
+#include "../../ParserOptions.h"
 
 namespace Odb::Lib::FileModel::Design
 {
