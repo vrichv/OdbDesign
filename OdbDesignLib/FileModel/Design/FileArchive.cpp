@@ -1,6 +1,9 @@
 #include "FileArchive.h"
 #include <filesystem>
 #include "ArchiveExtractor.h"
+#include "../../ParserOptions.h"
+#include <algorithm>
+#include <cctype>
 #include "CrossPlatform.h"
 #include "MiscInfoFile.h"
 #include "Logger.h"
