@@ -1,0 +1,311 @@
+diff --git a/OdbDesignLib/CMakeLists.txt b/OdbDesignLib/CMakeLists.txt
+index 9d17482..5122c6d 100644
+--- a/OdbDesignLib/CMakeLists.txt
++++ b/OdbDesignLib/CMakeLists.txt
+@@ -1,8 +1,8 @@
+-﻿# CMakeList.txt : CMake project for OdbDesignLib
++# CMakeList.txt : CMake project for OdbDesignLib
+ #
+ 
+ add_library(OdbDesign SHARED 
+-        "odbdesign_export.h" "FileModel/Design/ComponentsFile.cpp" "FileModel/Design/ComponentsFile.h" "FileModel/Design/EdaDataFile.cpp" "FileModel/Design/EdaDataFile.h" "FileModel/Design/LayerDirectory.cpp" "FileModel/Design/LayerDirectory.h" "FileModel/Design/NetlistFile.cpp" "FileModel/Design/NetlistFile.h" "FileModel/Design/FileArchive.cpp" "FileModel/Design/FileArchive.h" "FileModel/Design/StepDirectory.cpp" "FileModel/Design/StepDirectory.h" "ProductModel/Net.h" "ProductModel/Net.cpp" "ProductModel/Component.h" "ProductModel/Component.cpp" "ProductModel/Pin.h" "ProductModel/Pin.cpp" "ProductModel/PinConnection.h" "ProductModel/PinConnection.cpp" "ProductModel/Package.h" "ProductModel/Package.cpp" "ProductModel/Part.h" "ProductModel/Part.cpp" "ProductModel/Via.h" "ProductModel/Via.cpp" "ProductModel/Design.h" "ProductModel/Design.cpp"  "OdbDesign.h" "App/DesignCache.h" "App/DesignCache.cpp"   "../Utils/win.h" "IProtoBuffable.h" "../Utils/crow_win.h" "FileModel/OdbFile.h" "FileModel/OdbFile.cpp"      "App/IOdbApp.h" "App/IOdbApp.cpp" "App/OdbAppBase.h" "App/OdbAppBase.cpp" "App/RouteController.h" "App/RouteController.cpp" "App/IOdbServerApp.h" "App/IOdbServerApp.cpp"
++        "ParserOptions.cpp" "ParserOptions.h" "odbdesign_export.h" "FileModel/Design/ComponentsFile.cpp" "FileModel/Design/ComponentsFile.h" "FileModel/Design/EdaDataFile.cpp" "FileModel/Design/EdaDataFile.h" "FileModel/Design/LayerDirectory.cpp" "FileModel/Design/LayerDirectory.h" "FileModel/Design/NetlistFile.cpp" "FileModel/Design/NetlistFile.h" "FileModel/Design/FileArchive.cpp" "FileModel/Design/FileArchive.h" "FileModel/Design/StepDirectory.cpp" "FileModel/Design/StepDirectory.h" "ProductModel/Net.h" "ProductModel/Net.cpp" "ProductModel/Component.h" "ProductModel/Component.cpp" "ProductModel/Pin.h" "ProductModel/Pin.cpp" "ProductModel/PinConnection.h" "ProductModel/PinConnection.cpp" "ProductModel/Package.h" "ProductModel/Package.cpp" "ProductModel/Part.h" "ProductModel/Part.cpp" "ProductModel/Via.h" "ProductModel/Via.cpp" "ProductModel/Design.h" "ProductModel/Design.cpp"  "OdbDesign.h" "App/DesignCache.h" "App/DesignCache.cpp"   "../Utils/win.h" "IProtoBuffable.h" "../Utils/crow_win.h" "FileModel/OdbFile.h" "FileModel/OdbFile.cpp"      "App/IOdbApp.h" "App/IOdbApp.cpp" "App/OdbAppBase.h" "App/OdbAppBase.cpp" "App/RouteController.h" "App/RouteController.cpp" "App/IOdbServerApp.h" "App/IOdbServerApp.cpp"
+         FileModel/Design/MatrixFile.cpp
+         FileModel/Design/MatrixFile.h
+         FileModel/Design/MiscInfoFile.cpp
+diff --git a/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp b/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
+index f65f237..d06467a 100644
+--- a/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
++++ b/OdbDesignLib/FileModel/Design/AttributeLookupTable.cpp
+@@ -1,5 +1,6 @@
+ #include "AttributeLookupTable.h"
+ #include <sstream>
++#include "../../ParserOptions.h"
+ 
+ namespace Odb::Lib::FileModel::Design
+ {
+@@ -15,7 +16,13 @@ namespace Odb::Lib::FileModel::Design
+ 
+ 		// skip the content before the first semicolon
+ 		if (!std::getline(ss, token, ';'))
++		{
++			if (OdbDesign::g_parser_options.allow_missing_attr_table)
++			{
++				return true;
++			}
+ 			return false;
++		}
+ 
+ 		// attributes
+ 		if (std::getline(ss, token, ';'))
+diff --git a/OdbDesignLib/FileModel/Design/FeaturesFile.cpp b/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
+index 39bc5c3..6c07bbf 100644
+--- a/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
++++ b/OdbDesignLib/FileModel/Design/FeaturesFile.cpp
+@@ -8,6 +8,7 @@
+ #include "SymbolName.h"
+ #include "equals_within.h"
+ #include "macros.h"
++#include "../../ParserOptions.h"
+ 
+ #include <algorithm>
+ #include <cctype>
+@@ -284,11 +285,15 @@ namespace Odb::Lib::FileModel::Design
+ 						}
+ 
+ 						std::string attrIdString;
+-						lineStream >> attrIdString;
+ 
+-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++						if (lineStream >> attrIdString)
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							pFeatureRecord->ParseAttributeLookupTable(attrIdString);
++						}
++						else
++						{
++							if (!OdbDesign::g_parser_options.optional_attr)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						m_featureRecords.push_back(pFeatureRecord);
+@@ -352,20 +357,30 @@ namespace Odb::Lib::FileModel::Design
+ 
+ 						if (!(lineStream >> pFeatureRecord->dcode))
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							if (!OdbDesign::g_parser_options.optional_dcode)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						if (!(lineStream >> pFeatureRecord->orient_def))
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							if (!OdbDesign::g_parser_options.optional_orient)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						std::string attrIdString;
+-						lineStream >> attrIdString;
+ 
+-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++						if (lineStream >> attrIdString)
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++							{
++								if (!OdbDesign::g_parser_options.optional_attr)
++									throw_parse_error(m_path, line, token, lineNumber);
++							}
++						}
++						else
++						{
++							if (!OdbDesign::g_parser_options.optional_attr)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						m_featureRecords.push_back(pFeatureRecord);
+@@ -442,9 +457,20 @@ namespace Odb::Lib::FileModel::Design
+ 							throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+-						if (!(lineStream >> std::quoted(pFeatureRecord->text, '\'')))
++						std::string text;
++						std::getline(lineStream, text);
++
++						if (text.size() == 0)
++							text = "";
++						else
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							// Try to parse quoted text
++							std::stringstream textStream(text);
++							if (!(textStream >> std::quoted(pFeatureRecord->text, '\'')))
++							{
++								if (!OdbDesign::g_parser_options.optional_attr)
++									throw_parse_error(m_path, line, token, lineNumber);
++							}
+ 						}
+ 
+ 						if (!(lineStream >> pFeatureRecord->version))
+@@ -453,11 +479,19 @@ namespace Odb::Lib::FileModel::Design
+ 						}
+ 
+ 						std::string attrIdString;
+-						lineStream >> attrIdString;
+ 
+-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++						if (lineStream >> attrIdString)
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++							{
++								if (!OdbDesign::g_parser_options.optional_attr)
++									throw_parse_error(m_path, line, token, lineNumber);
++							}
++						}
++						else
++						{
++							if (!OdbDesign::g_parser_options.optional_attr)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						m_featureRecords.push_back(pFeatureRecord);
+@@ -548,11 +582,19 @@ namespace Odb::Lib::FileModel::Design
+ 						}
+ 
+ 						std::string attrIdString;
+-						lineStream >> attrIdString;
+ 
+-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++						if (lineStream >> attrIdString)
+ 						{
+-							throw_parse_error(m_path, line, token, lineNumber);
++							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
++							{
++								if (!OdbDesign::g_parser_options.optional_attr)
++									throw_parse_error(m_path, line, token, lineNumber);
++							}
++						}
++						else
++						{
++							if (!OdbDesign::g_parser_options.optional_attr)
++								throw_parse_error(m_path, line, token, lineNumber);
+ 						}
+ 
+ 						m_featureRecords.push_back(pFeatureRecord);
+diff --git a/OdbDesignLib/FileModel/Design/FileArchive.cpp b/OdbDesignLib/FileModel/Design/FileArchive.cpp
+index f6374d3..1b026cc 100644
+--- a/OdbDesignLib/FileModel/Design/FileArchive.cpp
++++ b/OdbDesignLib/FileModel/Design/FileArchive.cpp
+@@ -1,6 +1,9 @@
+ #include "FileArchive.h"
+ #include <filesystem>
+ #include "ArchiveExtractor.h"
++#include "../../ParserOptions.h"
++#include <algorithm>
++#include <cctype>
+ #include "CrossPlatform.h"
+ #include "MiscInfoFile.h"
+ #include "Logger.h"
+@@ -11,10 +14,33 @@
+ #include <cstdio>
+ #include <string>
+ #include <memory>
++#include <algorithm>
++#include "../../ParserOptions.h"
+ 
+ using namespace Utils;
+ using namespace std::filesystem;
+ 
++namespace
++{
++	static std::filesystem::path FindCaseInsensitive(
++		const std::filesystem::path& base,
++		const std::string& name)
++	{
++		for (auto& p : std::filesystem::directory_iterator(base))
++		{
++			auto n = p.path().filename().string();
++			std::transform(n.begin(), n.end(), n.begin(), ::tolower);
++
++			std::string t = name;
++			std::transform(t.begin(), t.end(), t.begin(), ::tolower);
++
++			if (n == t)
++				return p.path();
++		}
++		return base / name;
++	}
++}
++
+ namespace Odb::Lib::FileModel::Design
+ {
+ 	FileArchive::FileArchive()		
+@@ -307,10 +333,24 @@ namespace Odb::Lib::FileModel::Design
+ 		}
+ 	}
+ 
+-	bool FileArchive::ParseDesignDirectory(const path& path)
++	bool FileArchive::ParseDesignDirectory(const path& inputPath)
+ 	{
+-		if (!exists(path)) return false;
+-		else if (!is_directory(path)) return false;
++		path searchPath = inputPath;
++		if (!exists(searchPath))
++		{
++			if (OdbDesign::g_parser_options.case_insensitive_path)
++			{
++				searchPath = FindCaseInsensitive(searchPath.parent_path(), searchPath.filename().string());
++				if (!exists(searchPath)) return false;
++			}
++			else
++			{
++				return false;
++			}
++		}
++		if (!is_directory(searchPath)) return false;
++
++		const path& path = searchPath;
+ 
+ 		m_productName = path.stem().string();
+ 
+diff --git a/OdbDesignLib/FileModel/Design/MatrixFile.cpp b/OdbDesignLib/FileModel/Design/MatrixFile.cpp
+index 1520300..a661d11 100644
+--- a/OdbDesignLib/FileModel/Design/MatrixFile.cpp
++++ b/OdbDesignLib/FileModel/Design/MatrixFile.cpp
+@@ -7,6 +7,7 @@
+ #include "str_utils.h"
+ #include <string>
+ #include "../../Constants.h"
++#include "../../ParserOptions.h"
+ #include <sstream>
+ #include "../parse_error.h"
+ #include <Logger.h>
+@@ -16,6 +17,7 @@
+ #include "../OdbFile.h"
+ #include <memory>
+ #include <ostream>
++#include "../../ParserOptions.h"
+ 
+ namespace Odb::Lib::FileModel::Design
+ {
+diff --git a/OdbDesignLib/ParserOptions.cpp b/OdbDesignLib/ParserOptions.cpp
+new file mode 100644
+index 0000000..4a4f09b
+--- /dev/null
++++ b/OdbDesignLib/ParserOptions.cpp
+@@ -0,0 +1,6 @@
++#include "ParserOptions.h"
++
++namespace OdbDesign
++{
++ParserOptions g_parser_options;
++}
+diff --git a/OdbDesignLib/ParserOptions.h b/OdbDesignLib/ParserOptions.h
+new file mode 100644
+index 0000000..15a5819
+--- /dev/null
++++ b/OdbDesignLib/ParserOptions.h
+@@ -0,0 +1,21 @@
++#pragma once
++
++namespace OdbDesign
++{
++
++struct ParserOptions
++{
++    bool altium_compat = true;
++
++    bool optional_attr = true;
++    bool optional_dcode = true;
++    bool optional_orient = true;
++    bool optional_mirror = true;
++
++    bool case_insensitive_path = true;
++    bool allow_missing_attr_table = true;
++};
++
++extern ParserOptions g_parser_options;
++
++}

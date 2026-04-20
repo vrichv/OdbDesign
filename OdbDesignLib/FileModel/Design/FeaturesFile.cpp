@@ -281,7 +281,8 @@ namespace Odb::Lib::FileModel::Design
 
 						if (!(lineStream >> pFeatureRecord->dcode))
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!OdbDesign::g_parser_options.optional_dcode)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						std::string attrIdString;
