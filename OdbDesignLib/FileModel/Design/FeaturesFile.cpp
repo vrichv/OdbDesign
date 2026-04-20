@@ -8,6 +8,7 @@
 #include "SymbolName.h"
 #include "equals_within.h"
 #include "macros.h"
+#include "../../ParserOptions.h"
 
 #include <algorithm>
 #include <cctype>
@@ -279,19 +280,23 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						if (!(lineStream >> pFeatureRecord->dcode))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+				{
+					if (!g_parser_options.optional_dcode)
+						throw_parse_error(m_path, line, token, lineNumber);
+				}
 
-						std::string attrIdString;
-						lineStream >> attrIdString;
+				std::string attrIdString;
+				if (lineStream >> attrIdString)
+				{
+					pFeatureRecord->ParseAttributeLookupTable(attrIdString);
+				}
+				else
+				{
+					if (!g_parser_options.optional_attr)
+						throw_parse_error(m_path, line, token, lineNumber);
+				}
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
-
-						m_featureRecords.push_back(pFeatureRecord);
+				m_featureRecords.push_back(pFeatureRecord);
 					}
 					else if (line.find(FeatureRecord::PAD_TOKEN) == 0)
 					{
@@ -356,19 +361,26 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						if (!(lineStream >> pFeatureRecord->orient_def))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+				{
+					if (!g_parser_options.optional_orient)
+						throw_parse_error(m_path, line, token, lineNumber);
+				}
 
-						std::string attrIdString;
-						lineStream >> attrIdString;
+				int mirror = 0;
+				lineStream >> mirror;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+				std::string attrIdString;
+				if (lineStream >> attrIdString)
+				{
+					pFeatureRecord->ParseAttributeLookupTable(attrIdString);
+				}
+				else
+				{
+					if (!g_parser_options.optional_attr)
+						throw_parse_error(m_path, line, token, lineNumber);
+				}
 
-						m_featureRecords.push_back(pFeatureRecord);
+				m_featureRecords.push_back(pFeatureRecord);
 					}
 					else if (line.find(FeatureRecord::TEXT_TOKEN) == 0)
 					{
@@ -442,23 +454,24 @@ namespace Odb::Lib::FileModel::Design
 							throw_parse_error(m_path, line, token, lineNumber);
 						}
 
-						if (!(lineStream >> std::quoted(pFeatureRecord->text, '\'')))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+						std::string text;
+					std::getline(lineStream, text);
 
-						if (!(lineStream >> pFeatureRecord->version))
-						{
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+					if (text.size() == 0)
+						text = "";
 
-						std::string attrIdString;
-						lineStream >> attrIdString;
+					pFeatureRecord->text = text;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
-						{
+					std::string attrIdString;
+					if (lineStream >> attrIdString)
+					{
+						pFeatureRecord->ParseAttributeLookupTable(attrIdString);
+					}
+					else
+					{
+						if (!g_parser_options.optional_attr)
 							throw_parse_error(m_path, line, token, lineNumber);
-						}
+					}
 
 						m_featureRecords.push_back(pFeatureRecord);
 					}
@@ -544,16 +557,23 @@ namespace Odb::Lib::FileModel::Design
 							pFeatureRecord->cw = false;
 							break;
 						default:
-							throw_parse_error(m_path, line, token, lineNumber);
-						}
+						throw_parse_error(m_path, line, token, lineNumber);
+					}
 
-						std::string attrIdString;
-						lineStream >> attrIdString;
-
+					std::string attrIdString;
+					if (lineStream >> attrIdString)
+					{
 						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!g_parser_options.optional_attr)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
+					}
+					else
+					{
+						if (!g_parser_options.optional_attr)
+							throw_parse_error(m_path, line, token, lineNumber);
+					}
 
 						m_featureRecords.push_back(pFeatureRecord);
 					}
