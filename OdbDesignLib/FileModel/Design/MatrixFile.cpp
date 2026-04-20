@@ -7,6 +7,7 @@
 #include "str_utils.h"
 #include <string>
 #include "../../Constants.h"
+#include "../../ParserOptions.h"
 #include <sstream>
 #include "../parse_error.h"
 #include <Logger.h>
@@ -16,6 +17,7 @@
 #include "../OdbFile.h"
 #include <memory>
 #include <ostream>
+#include "../../ParserOptions.h"
 
 namespace Odb::Lib::FileModel::Design
 {

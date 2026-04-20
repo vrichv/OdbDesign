@@ -1,6 +1,9 @@
 #include "FileArchive.h"
 #include <filesystem>
 #include "ArchiveExtractor.h"
+#include "../../ParserOptions.h"
+#include <algorithm>
+#include <cctype>
 #include "CrossPlatform.h"
 #include "MiscInfoFile.h"
 #include "Logger.h"
@@ -11,9 +14,32 @@
 #include <cstdio>
 #include <string>
 #include <memory>
+#include <algorithm>
+#include "../../ParserOptions.h"
 
 using namespace Utils;
 using namespace std::filesystem;
+
+namespace
+{
+	static std::filesystem::path FindCaseInsensitive(
+		const std::filesystem::path& base,
+		const std::string& name)
+	{
+		for (auto& p : std::filesystem::directory_iterator(base))
+		{
+			auto n = p.path().filename().string();
+			std::transform(n.begin(), n.end(), n.begin(), ::tolower);
+
+			std::string t = name;
+			std::transform(t.begin(), t.end(), t.begin(), ::tolower);
+
+			if (n == t)
+				return p.path();
+		}
+		return base / name;
+	}
+}
 
 namespace Odb::Lib::FileModel::Design
 {
@@ -307,10 +333,24 @@ namespace Odb::Lib::FileModel::Design
 		}
 	}
 
-	bool FileArchive::ParseDesignDirectory(const path& path)
+	bool FileArchive::ParseDesignDirectory(const path& inputPath)
 	{
-		if (!exists(path)) return false;
-		else if (!is_directory(path)) return false;
+		path searchPath = inputPath;
+		if (!exists(searchPath))
+		{
+			if (OdbDesign::g_parser_options.case_insensitive_path)
+			{
+				searchPath = FindCaseInsensitive(searchPath.parent_path(), searchPath.filename().string());
+				if (!exists(searchPath)) return false;
+			}
+			else
+			{
+				return false;
+			}
+		}
+		if (!is_directory(searchPath)) return false;
+
+		const path& path = searchPath;
 
 		m_productName = path.stem().string();
 
