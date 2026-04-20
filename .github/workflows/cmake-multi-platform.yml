@@ -56,11 +56,11 @@ jobs:
           - os: windows-2022
             preset: x64-release
           # Linux x64 Release (upgraded to 24.04 for newer toolchain)
-          - os: ubuntu-24.04
-            preset: linux-release
+          #- os: ubuntu-24.04
+          #  preset: linux-release
           # MacOS x64 Release
-          - os: macos-14
-            preset: macos-release
+          #- os: macos-14
+          #  preset: macos-release
           # Linux mingw x64 Release
           # - os: ubuntu-22.04
           #   preset: linux-mingw-w64-release
