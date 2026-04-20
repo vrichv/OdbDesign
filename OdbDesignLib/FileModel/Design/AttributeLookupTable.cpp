@@ -17,7 +17,7 @@ namespace Odb::Lib::FileModel::Design
 		// skip the content before the first semicolon
 		if (!std::getline(ss, token, ';'))
 		{
-			if (g_parser_options.allow_missing_attr_table)
+			if (OdbDesign::g_parser_options.allow_missing_attr_table)
 			{
 				return true;
 			}

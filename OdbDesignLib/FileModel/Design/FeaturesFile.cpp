@@ -368,9 +368,16 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						std::string attrIdString;
-						lineStream >> attrIdString;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+						if (lineStream >> attrIdString)
+						{
+							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+							{
+								if (!OdbDesign::g_parser_options.optional_attr)
+									throw_parse_error(m_path, line, token, lineNumber);
+							}
+						}
+						else
 						{
 							if (!OdbDesign::g_parser_options.optional_attr)
 								throw_parse_error(m_path, line, token, lineNumber);
@@ -472,11 +479,19 @@ namespace Odb::Lib::FileModel::Design
 						}
 
 						std::string attrIdString;
-						lineStream >> attrIdString;
 
-						if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+						if (lineStream >> attrIdString)
 						{
-							throw_parse_error(m_path, line, token, lineNumber);
+							if (!pFeatureRecord->ParseAttributeLookupTable(attrIdString))
+							{
+								if (!OdbDesign::g_parser_options.optional_attr)
+									throw_parse_error(m_path, line, token, lineNumber);
+							}
+						}
+						else
+						{
+							if (!OdbDesign::g_parser_options.optional_attr)
+								throw_parse_error(m_path, line, token, lineNumber);
 						}
 
 						m_featureRecords.push_back(pFeatureRecord);
