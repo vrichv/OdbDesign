@@ -75,7 +75,7 @@ namespace Odb::Test::Enhanced
         const char* nonExistentVar = std::getenv(ODB_TEST_NONEXISTENT_ENV_NAME);
         EXPECT_EQ(nonExistentVar, nullptr);
         
-        // Test accessing existing environment variable
+        // Test accessing existing environment variable (if set)
         const char* existingVar = std::getenv(ODB_TEST_ENV_NAME);
         if (existingVar != nullptr)
         {
